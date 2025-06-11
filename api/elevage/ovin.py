@@ -13,14 +13,18 @@ from schemas.elevage.ovin import (
     OvinCreate, OvinResponse,
     TonteCreate, TonteResponse
 )
-from utils.security import get_current_user
-from api import check_permissions
+from utils.security import get_current_manager
+from api import check_permissions_manager
 from machine_learning.analyse.elevage.ovin import OvinAnalysis
 
 router = APIRouter(
-    prefix="/api/ovin",
-    tags=["ovin"],
-    responses={404: {"description": "Not found"}},
+    prefix="/api/elevage/ovin",
+    tags=["Élevage Ovin"],
+    responses={
+        404: {"description": "Non trouvé"},
+        403: {"description": "Accès refusé"},
+        401: {"description": "Non authentifié"}
+    },
 )
 
 # ----------------------------
@@ -31,12 +35,12 @@ router = APIRouter(
 def create_ovin(
     ovin: OvinCreate,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Crée un nouvel ovin dans le système.
     """
-    check_permissions(db, current_user, ['admin', 'ovin_manager'])
+    check_permissions_manager(db, current_user, ['admin', 'ovin_manager'])
     try:
         db_ovin = Ovin(**ovin.model_dump())
         add_object(db, db_ovin)
@@ -52,12 +56,12 @@ def create_ovin(
 def get_ovin(
     ovin_id: int,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les détails d'un ovin spécifique.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     ovin = db.query(Ovin).filter(Ovin.id == ovin_id).first()
     if not ovin:
         raise HTTPException(
@@ -72,12 +76,12 @@ def list_ovins(
     limit: int = 100,
     search: SearchQuery = Depends(),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Liste tous les ovins avec pagination et filtres.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     query = db.query(Ovin)
     
@@ -117,12 +121,12 @@ def list_ovins(
 def create_tonte(
     tonte: TonteCreate,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Enregistre une tonte pour un ovin.
     """
-    check_permissions(db, current_user, ['admin', 'ovin_manager'])
+    check_permissions_manager(db, current_user, ['admin', 'ovin_manager'])
     try:
         db_tonte = Tonte(**tonte.model_dump())
         add_object(db, db_tonte)
@@ -148,12 +152,12 @@ def get_tontes(
     ovin_id: int,
     limit: int = 10,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère l'historique des tontes d'un ovin.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     tontes = db.query(Tonte)\
         .filter(Tonte.animal_id == ovin_id)\
         .order_by(Tonte.date_tonte.desc())\
@@ -171,12 +175,12 @@ def get_alertes(
     id: Optional[str] = None,
     severity: Optional[str] = None,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les alertes pour l'élevage ovin.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     analyzer = OvinAnalysis()
     alerts = analyzer.generate_alerts(animal_id=id)
     
@@ -194,12 +198,12 @@ def get_wool_production_stats(
     start_date: date,
     end_date: date,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les statistiques de production de laine.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     tontes = db.query(Tonte)\
         .filter(Tonte.date_tonte.between(start_date, end_date))\
@@ -228,12 +232,12 @@ def get_wool_production_stats(
 def export_data(
     file_type: str = Query("csv", description="Type de fichier (csv ou excel)", regex="^(csv|excel)$"),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Exporter des données ovines vers un fichier (CSV ou Excel)
     """
-    check_permissions(db, current_user, required_roles=['admin'])
+    check_permissions_manager(db, current_user, required_roles=['admin'])
     
     try:
         ovins = db.query(Ovin).all()

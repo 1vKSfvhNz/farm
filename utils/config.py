@@ -2,7 +2,7 @@ from json import load
 from logging import basicConfig, ERROR
 
 # URLs et chemins
-BASE_URL = "https://realb.onrender.com"
+BASE_URL = "https://"
 
 # Configuration du logger
 basicConfig(level=ERROR)

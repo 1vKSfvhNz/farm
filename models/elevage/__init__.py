@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Text, Date, ForeignKey, Enum as SqlEnum
+from sqlalchemy import Column, Integer, String, DateTime, Float, Text, Date, ForeignKey, Boolean, Enum as SqlEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from models import Base
@@ -46,7 +46,22 @@ class Pesee(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     
     animal = relationship("Animal", back_populates="pesees")
+
+class Traitement(Base):
+    __tablename__ = 'traitements'
     
+    id = Column(Integer, primary_key=True)
+    animal_id = Column(Integer, ForeignKey('animaux.id'), nullable=False)
+    type_traitement = Column(String(100), nullable=False)
+    date_debut = Column(Date, nullable=False)
+    date_fin = Column(Date)
+    produit = Column(String(200), nullable=False)
+    posologie = Column(String(100))
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    
+    animal = relationship("Animal", back_populates="traitements")
+
 class Animal(Base):
     __tablename__ = 'animaux'
     
@@ -66,9 +81,9 @@ class Animal(Base):
     cause_deces = Column(String(200))
     informations_specifiques = Column(Text)  # JSON string pour données spécifiques
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    created_by = Column(Integer)  # Devrait être un Integer pour l'ID de l'utilisateur
+    created_by = Column(Integer)  # ID de l'utilisateur
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    updated_by = Column(Integer)  # Devrait être un Integer pour l'ID de l'utilisateur
+    updated_by = Column(Integer)  # ID de l'utilisateur
     photo_url = Column(String(255), nullable=True)
     
     # Relations
@@ -83,7 +98,7 @@ class Animal(Base):
     # Relations spécifiques bovin/caprin
     productions_lait = relationship("ProductionLait", back_populates="animal")
     controles_laitiers = relationship("ControleLaitier", back_populates="animal")
-    inseminations = relationship("Insemination", back_populates="animal")
+    inseminations = relationship("Insemination", foreign_keys="[Insemination.animal_id]", back_populates="animal")
 
 ### Modèles Bovins/Caprins/Ovins (production laitière)
 class ProductionLait(Base):
@@ -108,12 +123,29 @@ class ControleLaitier(Base):
     date_controle = Column(Date, nullable=False)
     production_jour = Column(Float)  # litres
     taux_butyreux = Column(Float)  # %
-    taux_proteine = Column(Float)  # %
+    taux_proteique = Column(Float)  # %
     cellules_somatiques = Column(Integer)  # cellules/ml
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     
     animal = relationship("Animal", back_populates="controles_laitiers")
+
+class Insemination(Base):
+    __tablename__ = 'inseminations'
+    
+    id = Column(Integer, primary_key=True)
+    animal_id = Column(Integer, ForeignKey('animaux.id'), nullable=False)
+    date_insemination = Column(Date, nullable=False)
+    taureau_id = Column(Integer, ForeignKey('animaux.id'))
+    methode = Column(String(100))
+    succes = Column(Boolean)
+    date_verification_gestation = Column(Date)
+    resultat_gestation = Column(Boolean)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    
+    animal = relationship("Animal", back_populates="inseminations", foreign_keys=[animal_id])
+    taureau = relationship("Animal", foreign_keys=[taureau_id])
 
 ## Modèles communs supplémentaires
 class Evenement(Base):
@@ -155,6 +187,8 @@ class RationAlimentation(Base):
     type_animal = Column(String(100))  # veau, vache laitière, poule pondeuse, etc.
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    
+    compositions = relationship("CompositionRation", back_populates="ration")
 
 class CompositionRation(Base):
     __tablename__ = 'compositions_rations'
@@ -165,7 +199,7 @@ class CompositionRation(Base):
     quantite = Column(Float, nullable=False)  # kg ou %
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     
-    ration = relationship("RationAlimentation")
+    ration = relationship("RationAlimentation", back_populates="compositions")
     aliment = relationship("Aliment")
 
 class Batiment(Base):
@@ -180,3 +214,36 @@ class Batiment(Base):
     ventilation = Column(String(100))
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    
+    lots = relationship("Lot", back_populates="batiment")
+
+class Vaccination(Base):
+    __tablename__ = 'vaccinations'
+    
+    id = Column(Integer, primary_key=True)
+    animal_id = Column(Integer, ForeignKey('animaux.id'))
+    lot_id = Column(Integer, ForeignKey('lots.id'))
+    type_vaccin = Column(String(100), nullable=False)
+    date_vaccination = Column(Date, nullable=False)
+    date_rappel = Column(Date)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    
+    animal = relationship("Animal")
+    lot = relationship("Lot")
+
+class Reproduction(Base):
+    __tablename__ = 'reproductions'
+    
+    id = Column(Integer, primary_key=True)
+    animal_id = Column(Integer, ForeignKey('animaux.id'), nullable=False)
+    date_saillie = Column(Date, nullable=False)
+    male_id = Column(Integer, ForeignKey('animaux.id'))
+    date_mise_bas_prevue = Column(Date)
+    date_mise_bas_reelle = Column(Date)
+    nombre_jeunes = Column(Integer)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    
+    animal = relationship("Animal", foreign_keys=[animal_id])
+    male = relationship("Animal", foreign_keys=[male_id])

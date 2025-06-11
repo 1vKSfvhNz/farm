@@ -14,7 +14,7 @@ from models.elevage.piscicole import (
     ControleEau,
     RecoltePoisson
 )
-from utils.security import get_current_user
+from utils.security import get_current_manager
 from schemas.elevage.piscicole import (
     BassinBase,
     BassinResponse,
@@ -28,14 +28,18 @@ from schemas.elevage.piscicole import (
     PredictionCroissanceOutput,
     PredictionCroissanceInput
 )
-from api import check_permissions
+from api import check_permissions_manager
 from machine_learning.analyse.elevage.piscicole import AnalyseurPiscicole
 from machine_learning.prediction.elevage.piscicole import PisciculturePredictor
 
 router = APIRouter(
-    prefix="/api/piscicole",
-    tags=["piscicole"],
-    responses={404: {"description": "Not found"}},
+    prefix="/api/elevage/piscicole",
+    tags=["Élevage Piscicole"],
+    responses={
+        404: {"description": "Non trouvé"},
+        403: {"description": "Accès refusé"},
+        401: {"description": "Non authentifié"}
+    },
 )
 
 # ==============================================
@@ -45,11 +49,11 @@ router = APIRouter(
 @router.post("/bassins/", response_model=BassinResponse)
 async def create_bassin(
     bassin: BassinBase,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Créer un nouveau bassin piscicole"""
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         db_bassin = BassinPiscicole(**bassin.model_dump())
@@ -66,11 +70,11 @@ async def create_bassin(
 async def read_bassins(
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Lister tous les bassins piscicoles"""
-    check_permissions(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
     
     bassins = db.query(BassinPiscicole).offset(skip).limit(limit).all()
     return bassins
@@ -78,11 +82,11 @@ async def read_bassins(
 @router.get("/bassins/{bassin_id}", response_model=BassinResponse)
 async def read_bassin(
     bassin_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Obtenir les détails d'un bassin spécifique"""
-    check_permissions(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
     
     bassin = db.query(BassinPiscicole).filter(BassinPiscicole.id == bassin_id).first()
     if bassin is None:
@@ -96,11 +100,11 @@ async def read_bassin(
 async def update_bassin(
     bassin_id: int,
     bassin: BassinBase,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Mettre à jour un bassin piscicole"""
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     db_bassin = db.query(BassinPiscicole).filter(BassinPiscicole.id == bassin_id).first()
     if db_bassin is None:
@@ -127,11 +131,11 @@ async def update_bassin(
 @router.delete("/bassins/{bassin_id}")
 async def delete_bassin(
     bassin_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Supprimer un bassin piscicole"""
-    check_permissions(db, current_user, required_roles=['admin'])
+    check_permissions_manager(db, current_user, required_roles=['admin'])
     
     db_bassin = db.query(BassinPiscicole).filter(BassinPiscicole.id == bassin_id).first()
     if db_bassin is None:
@@ -158,11 +162,11 @@ async def delete_bassin(
 @router.post("/poissons/", response_model=PoissonResponse)
 async def create_poisson(
     poisson: PoissonBase,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Créer un nouveau poisson"""
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         db_poisson = Poisson(**poisson.model_dump())
@@ -180,11 +184,11 @@ async def read_poissons(
     bassin_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Lister les poissons (optionnellement filtrés par bassin)"""
-    check_permissions(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
     
     query = db.query(Poisson)
     if bassin_id:
@@ -196,11 +200,11 @@ async def read_poissons(
 @router.get("/poissons/{poisson_id}", response_model=PoissonResponse)
 async def read_poisson(
     poisson_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Obtenir les détails d'un poisson spécifique"""
-    check_permissions(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
     
     poisson = db.query(Poisson).filter(Poisson.id == poisson_id).first()
     if poisson is None:
@@ -217,11 +221,11 @@ async def read_poisson(
 @router.post("/controles-eau/", response_model=ControleEauResponse)
 async def create_controle_eau(
     controle: ControleEauCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Créer un nouveau contrôle d'eau"""
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         db_controle = ControleEau(**controle.model_dump())
@@ -239,11 +243,11 @@ async def read_controles_eau(
     bassin_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Lister les contrôles d'eau (optionnellement filtrés par bassin)"""
-    check_permissions(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
     
     query = db.query(ControleEau)
     if bassin_id:
@@ -259,11 +263,11 @@ async def read_controles_eau(
 @router.post("/recoltes/", response_model=RecolteResponse)
 async def create_recolte(
     recolte: RecolteCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Créer une nouvelle récolte"""
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         db_recolte = RecoltePoisson(**recolte.model_dump())
@@ -281,11 +285,11 @@ async def read_recoltes(
     bassin_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Lister les récoltes (optionnellement filtrées par bassin)"""
-    check_permissions(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'piscicole_manager', 'piscicole_technicien'])
     
     query = db.query(RecoltePoisson)
     if bassin_id:
@@ -300,11 +304,11 @@ async def read_recoltes(
 
 @router.get("/analyses/alertes", response_model=List[AlertePiscicole])
 async def get_alertes_piscicoles(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Obtenir les alertes pour l'élevage piscicole"""
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     analyzer = AnalyseurPiscicole()
     alertes = analyzer.analyser_bassins()
@@ -313,11 +317,11 @@ async def get_alertes_piscicoles(
 @router.post("/predictions/croissance", response_model=PredictionCroissanceOutput)
 async def predict_croissance(
     input_data: PredictionCroissanceInput,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Prédire le taux de croissance des poissons"""
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         predictor = PisciculturePredictor()
@@ -342,11 +346,11 @@ async def predict_croissance(
 @router.get("/export/data")
 async def export_data(
     file_type: str = Query("csv", description="Type de fichier (csv ou excel)", regex="^(csv|excel)$"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_manager),
     db: Session = Depends(get_db)
 ):
     """Exporter des données piscicoles vers un fichier (CSV ou Excel)"""
-    check_permissions(db, current_user, required_roles=['admin'])
+    check_permissions_manager(db, current_user, required_roles=['admin'])
     
     try:
         bassins = db.query(BassinPiscicole).all()

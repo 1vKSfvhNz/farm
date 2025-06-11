@@ -8,6 +8,6 @@ __all__ = [
     "AvicolePredictor",
     "BovinProductionPredictor",
     "CaprinProductionPredictor",
-    "OvinMLModels",
+    "OvinProductionPredictor",
     "PisciculturePredictor"
 ]

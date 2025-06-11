@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import Union, Any, Dict, Optional
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
@@ -46,8 +47,7 @@ class BovinProductionPredictor:
         self.preprocessor = None
         self.features = [
             'race', 'age', 'nombre_velages', 'statut_reproduction',
-            'production_lait_305j', 'taux_cellulaires_moyen',
-            'poids_moyen', 'temperature_moyenne', 'alimentation_score'
+            'production_lait_305j', 'taux_cellulaires_moyen', 'poids_moyen' 
         ]
         self.target = 'production_jour'
         self.performance = ModelPerformance(model_name="BovinProductionPredictor")
@@ -55,29 +55,41 @@ class BovinProductionPredictor:
         if model_path:
             self.load_model(model_path)
     
-    async def load_data_async(self) -> pd.DataFrame:
+    # Modifier la méthode prepare_training_data_async
+    async def prepare_training_data_async(self) -> pd.DataFrame:
         """Charge les données depuis la base de données en mode asynchrone"""
-        query = """
-        SELECT 
-            b.id, b.type_production, b.statut_reproduction, b.nombre_velages,
-            b.production_lait_305j, b.taux_cellulaires_moyen,
-            a.numero_identification, a.sexe, a.date_naissance,
-            r.nom as race, r.caracteristiques,
-            cl.date_controle, cl.production_jour, cl.taux_butyreux, 
-            cl.taux_proteine, cl.cellules_somatiques,
-            pl.date_production, pl.quantite, pl.debit_moyen
-        FROM bovins b
-        JOIN animaux a ON b.id = a.id
-        JOIN races r ON a.race_id = r.id
-        LEFT JOIN controles_laitiers cl ON cl.animal_id = a.id
-        LEFT JOIN production_lait pl ON pl.animal_id = a.id
-        WHERE b.type_production = 'LAITIERE' OR b.type_production = 'MIXTE'
-        """
+        if not self.db_session or not self.is_async:
+            raise ValueError("Async DB session must be set to prepare training data")
+            
+        try:
+            query = """
+            SELECT 
+                b.id, b.type_production, b.statut_reproduction, b.nombre_velages,
+                b.production_lait_305j, b.taux_cellulaires_moyen,
+                a.numero_identification, a.sexe, a.date_naissance,
+                r.nom as race, r.caracteristiques,
+                cl.date_controle, cl.production_jour, cl.taux_butyreux, 
+                cl.taux_proteine, cl.cellules_somatiques
+            FROM bovins b
+            JOIN animaux a ON b.id = a.id
+            JOIN races r ON a.race_id = r.id
+            LEFT JOIN controles_laitiers cl ON cl.animal_id = a.id
+            WHERE b.type_production IN ('LAITIERE', 'MIXTE')
+            """
+            
+            # Utilisation correcte de la session asynchrone
+            result = await self.db_session.execute(text(query))
+            rows = result.fetchall()
+            
+            # Conversion en DataFrame
+            df = pd.DataFrame(rows, columns=result.keys())
+            return self._process_data(df)
+        except Exception as e:
+            if self.db_session:
+                await self.db_session.rollback()
+            raise e
         
-        df = await self.loader.execute_query(query)
-        return self._process_data(df)
-        
-    def load_data_sync(self) -> pd.DataFrame:
+    def prepare_training_data_sync(self) -> pd.DataFrame:
         """Charge les données depuis la base de données en mode synchrone"""
         query = """
         SELECT 
@@ -86,8 +98,7 @@ class BovinProductionPredictor:
             a.numero_identification, a.sexe, a.date_naissance,
             r.nom as race, r.caracteristiques,
             cl.date_controle, cl.production_jour, cl.taux_butyreux, 
-            cl.taux_proteine, cl.cellules_somatiques,
-            pl.date_production, pl.quantite, pl.debit_moyen
+            cl.taux_proteine, cl.cellules_somatiques, pl.date_production
         FROM bovins b
         JOIN animaux a ON b.id = a.id
         JOIN races r ON a.race_id = r.id
@@ -96,7 +107,7 @@ class BovinProductionPredictor:
         WHERE b.type_production = 'LAITIERE' OR b.type_production = 'MIXTE'
         """
         
-        df = self.loader.execute_query(query)
+        df = self.loader.execute_query(text(query))
         return self._process_data(df)
         
     def _process_data(self, df: pd.DataFrame):
@@ -131,8 +142,8 @@ class BovinProductionPredictor:
     async def load_data(self):
         """Charge les données en fonction du mode"""
         if self.is_async:
-            return await self.load_data_async()
-        return self.load_data_sync()
+            return await self.prepare_training_data_async()
+        return self.prepare_training_data_sync()
     
     def preprocess_data(self, df: pd.DataFrame):
         """Prétraitement des données pour le modèle"""

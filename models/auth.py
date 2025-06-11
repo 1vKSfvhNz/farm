@@ -8,10 +8,7 @@ def now_utc():
     """Retourne l'heure actuelle en UTC."""
     return datetime.now(timezone.utc)
 
-class GenerateCode(Base):
-    __tablename__ = "generate_codes"
-
-    email = Column(String, primary_key=True, index=True)
+class GenerateCode:
     code = Column(String, nullable=False, default=gen_code)
     created_at = Column(DateTime, nullable=False, default=now_utc)  # Toujours UTC
     updated_at = Column(DateTime, nullable=False, default=now_utc, onupdate=now_utc)
@@ -32,3 +29,11 @@ class GenerateCode(Base):
         db.add(self)
         db.commit()
         db.refresh(self)
+
+class GenerateCodeUser(GenerateCode, Base):
+    __tablename__ = "generate_codes_user"
+    email = Column(String, primary_key=True, index=True)
+
+class GenerateCodeManager(GenerateCode, Base):
+    __tablename__ = "generate_codes_manager"
+    phone = Column(String, primary_key=True, index=True)

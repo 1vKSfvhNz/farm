@@ -17,15 +17,18 @@ from schemas.elevage.caprin import (
 from schemas.elevage import ProductionLaitCreate, ProductionLaitResponse
 from machine_learning.analyse.elevage.caprin import CaprinAnalysis
 from machine_learning.prediction.elevage.caprin import CaprinProductionPredictor
-from utils.security import get_current_user
-from api import check_permissions
+from utils.security import get_current_manager
+from api import check_permissions_manager
 
 router = APIRouter(
-    prefix="/api/caprin",
-    tags=["caprin"],
-    responses={404: {"description": "Not found"}},
+    prefix="/api/elevage/caprin",
+    tags=["Élevage Caprin"],
+    responses={
+        404: {"description": "Non trouvé"},
+        403: {"description": "Accès refusé"},
+        401: {"description": "Non authentifié"}
+    },
 )
-
 # ----------------------------
 # Endpoints Caprins
 # ----------------------------
@@ -34,12 +37,12 @@ router = APIRouter(
 def create_caprin(
     caprin: CaprinCreate,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Crée un nouveau caprin dans le système.
     """
-    check_permissions(db, current_user, ['admin', 'caprin_manager'])
+    check_permissions_manager(db, current_user, ['admin', 'caprin_manager'])
     try:
         num = db.query(Caprin).count()
         db_caprin = Caprin(
@@ -60,12 +63,12 @@ def create_caprin(
 def get_caprin(
     caprin_id: int,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les détails d'un caprin spécifique.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     caprin = db.query(Caprin).filter(Caprin.id == caprin_id).first()
     if not caprin:
         raise HTTPException(
@@ -80,12 +83,12 @@ def list_caprins(
     limit: int = 100,
     search: SearchQuery = Depends(),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Liste tous les caprins avec pagination et filtres.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     query = db.query(Caprin)
     
@@ -125,12 +128,12 @@ def list_caprins(
 def create_production_lait(
     production: ProductionLaitCreate,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Enregistre une production laitière pour un caprin.
     """
-    check_permissions(db, current_user, ['admin', 'caprin_manager'])
+    check_permissions_manager(db, current_user, ['admin', 'caprin_manager'])
     try:
         db_production = ProductionLait(**production.model_dump())
         add_object_async(db, db_production)
@@ -155,12 +158,12 @@ def get_production_history(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère l'historique de production laitière d'un caprin.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     query = db.query(ProductionLait).filter(ProductionLait.animal_id == caprin_id)
     
     if start_date:
@@ -178,12 +181,12 @@ def get_production_history(
 def create_controle_laitier(
     controle: ControleLaitierCreate,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Enregistre un contrôle laitier pour un caprin.
     """
-    check_permissions(db, current_user, ['admin', 'caprin_manager'])
+    check_permissions_manager(db, current_user, ['admin', 'caprin_manager'])
     try:
         db_controle = ControleLaitierCaprin(**controle.model_dump())
         add_object_async(db, db_controle)
@@ -203,12 +206,12 @@ def create_controle_laitier(
 def get_alertes(
     severity: Optional[str] = None,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les alertes pour l'élevage caprin.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     analyzer = CaprinAnalysis()
     alerts = analyzer.generate_alerts()
     
@@ -226,12 +229,12 @@ def get_milk_production_stats(
     start_date: date,
     end_date: date,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les statistiques de production laitière.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     productions = db.query(ProductionLait)\
         .filter(ProductionLait.date_production.between(start_date, end_date))\
@@ -260,12 +263,12 @@ def get_milk_production_stats(
 def export_data(
     file_type: str = Query("csv", description="Type de fichier (csv ou excel)", regex="^(csv|excel)$"),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Exporter des données caprines vers un fichier (CSV ou Excel)
     """
-    check_permissions(db, current_user, required_roles=['admin'])
+    check_permissions_manager(db, current_user, required_roles=['admin'])
     
     try:
         caprins = db.query(Caprin).all()

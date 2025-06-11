@@ -5,7 +5,6 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import LabelEncoder
 from joblib import dump, load
-import datetime
 from typing import Dict, Any, Optional, List, Union
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,8 +13,7 @@ from dataclasses import asdict
 
 # Import des dépendances de la base de données
 from models import DatabaseLoader
-from models.elevage import Lot, Animal
-from models.elevage.avicole import Volaille, ControlePonte, PerformanceCroissanceAvicole
+from models.elevage.avicole import LotAvicole, ControlePonteLot, PerformanceLotAvicole, PeseeLotAvicole
 from machine_learning.base import ModelPerformance
 
 from pathlib import Path
@@ -41,6 +39,7 @@ class AvicolePredictor:
         self.model_performances: Dict[str, ModelPerformance] = {}
         self.ponte_data = None
         self.croissance_data = None
+        self.poids_data = None
         
         if model_path:
             self.load_model(model_path)
@@ -55,91 +54,218 @@ class AvicolePredictor:
         if not self.db_session or not self.is_async:
             raise ValueError("Async DB session must be set to prepare training data")
             
-        # Charger les données depuis la base de manière asynchrone
-        volailles = await self.loader.execute_query(select(Volaille))
-        animaux = await self.loader.execute_query(select(Animal))
-        lots = await self.loader.execute_query(select(Lot))
-        controles_ponte = await self.loader.execute_query(select(ControlePonte))
-        performances = await self.loader.execute_query(select(PerformanceCroissanceAvicole))
-        
-        # Convertir les résultats en DataFrames
-        volailles = pd.DataFrame([dict(v) for v in volailles])
-        animaux = pd.DataFrame([dict(a) for a in animaux])
-        lots = pd.DataFrame([dict(l) for l in lots])
-        controles_ponte = pd.DataFrame([dict(c) for c in controles_ponte])
-        performances = pd.DataFrame([dict(p) for p in performances])
-        
-        # Fusionner et préparer les données
-        data = pd.merge(volailles, animaux, left_on='id', right_on='id')
-        data = pd.merge(data, lots, left_on='lot_id', right_on='id', suffixes=('', '_lot'))
-        
-        # Préparer les données spécifiques
-        self._prepare_data(data, controles_ponte, performances)
-    
+        try:
+            # Charger les données depuis la base de manière asynchrone
+            query = select(LotAvicole)
+            controles_ponte_query = select(ControlePonteLot)
+            performances_query = select(PerformanceLotAvicole)
+            pesees_query = select(PeseeLotAvicole)
+            
+            # Exécuter les requêtes
+            result = await self.db_session.execute(query)
+            lots = result.scalars().unique().all()
+            
+            controles_result = await self.db_session.execute(controles_ponte_query)
+            controles_ponte = controles_result.scalars().all()
+            
+            performances_result = await self.db_session.execute(performances_query)
+            performances = performances_result.scalars().all()
+            
+            pesees_result = await self.db_session.execute(pesees_query)
+            pesees = pesees_result.scalars().all()
+            
+            # Convertir les résultats en DataFrames
+            lots_df = pd.DataFrame([{
+                'id': lot.id,
+                'type_volaille': lot.type_volaille.name if lot.type_volaille else None,
+                'type_production': lot.type_production.name if lot.type_production else None,
+                'systeme_elevage': lot.systeme_elevage.name if lot.systeme_elevage else None,
+                'souche': lot.souche,
+                'date_mise_en_place': lot.date_mise_en_place,
+                'effectif_initial': lot.effectif_initial,
+                'statut': lot.statut
+            } for lot in lots])
+            
+            controles_ponte_df = pd.DataFrame([{
+                'lot_id': controle.lot_id,
+                'date_controle': controle.date_controle,
+                'nombre_oeufs': controle.nombre_oeufs,
+                'poids_moyen_oeuf': controle.poids_moyen_oeuf,
+                'taux_ponte': controle.taux_ponte,
+                'taux_casses': controle.taux_casses,
+                'taux_sales': controle.taux_sales
+            } for controle in controles_ponte])
+
+            
+            performances_df = pd.DataFrame([{
+                'lot_id': perf.lot_id,
+                'date_controle': perf.date_controle,
+                'poids_moyen': perf.poids_moyen,
+                'gain_moyen_journalier': perf.gain_moyen_journalier,
+                'consommation_aliment': perf.consommation_aliment,
+                'indice_consommation': perf.indice_consommation,
+                'taux_mortalite': perf.taux_mortalite,
+                'uniformite': perf.uniformite
+            } for perf in performances])
+            
+            pesees_df = pd.DataFrame([{
+                'lot_id': pesee.lot_id,
+                'date_pesee': pesee.date_pesee,
+                'poids_moyen': pesee.poids_moyen,
+                'poids_total': pesee.poids_total
+            } for pesee in pesees])
+            
+            # Préparer les données spécifiques
+            self._prepare_data(lots_df, controles_ponte_df, performances_df, pesees_df)
+        except Exception as e:
+            await self.db_session.rollback()
+            raise e
+
     def prepare_training_data_sync(self):
         """Prépare les données d'entraînement à partir de la base de données (mode synchrone)."""
         if not self.db_session or self.is_async:
             raise ValueError("Sync DB session must be set to prepare training data")
             
         # Charger les données depuis la base de manière synchrone
-        volailles = self.loader.execute_query("SELECT * FROM volailles")
-        animaux = self.loader.execute_query("SELECT * FROM animaux")
-        lots = self.loader.execute_query("SELECT * FROM lots")
-        controles_ponte = self.loader.execute_query("SELECT * FROM controles_ponte")
-        performances = self.loader.execute_query("SELECT * FROM performances_croissance_avicole")
+        lots = self.db_session.query(LotAvicole).all()
+        controles_ponte = self.db_session.execute(select(ControlePonteLot)).scalars().all()
+        performances = self.db_session.query(PerformanceLotAvicole).all()
+        pesees = self.db_session.query(PeseeLotAvicole).all()
         
-        # Fusionner et préparer les données
-        data = pd.merge(volailles, animaux, left_on='id', right_on='id')
-        data = pd.merge(data, lots, left_on='lot_id', right_on='id', suffixes=('', '_lot'))
+        # Convertir les résultats en DataFrames
+        lots_df = pd.DataFrame([{
+            'id': lot.id,
+            'type_volaille': lot.type_volaille.name if lot.type_volaille else None,
+            'type_production': lot.type_production.name if lot.type_production else None,
+            'systeme_elevage': lot.systeme_elevage.name if lot.systeme_elevage else None,
+            'souche': lot.souche,
+            'date_mise_en_place': lot.date_mise_en_place,
+            'effectif_initial': lot.effectif_initial,
+            'statut': lot.statut
+        } for lot in lots])
+        
+        controles_ponte_df = pd.DataFrame([{
+            'lot_id': controle.lot_id,
+            'date_controle': controle.date_controle,
+            'nombre_oeufs': controle.nombre_oeufs,
+            'poids_moyen_oeuf': controle.poids_moyen_oeuf,
+            'taux_ponte': controle.taux_ponte,
+            'taux_casses': controle.taux_casses,
+            'taux_sales': controle.taux_sales
+        } for controle in controles_ponte])
+        
+        performances_df = pd.DataFrame([{
+            'lot_id': perf.lot_id,
+            'date_controle': perf.date_controle,
+            'poids_moyen': perf.poids_moyen,
+            'gain_moyen_journalier': perf.gain_moyen_journalier,
+            'consommation_aliment': perf.consommation_aliment,
+            'indice_consommation': perf.indice_consommation,
+            'taux_mortalite': perf.taux_mortalite,
+            'uniformite': perf.uniformite
+        } for perf in performances])
+        
+        pesees_df = pd.DataFrame([{
+            'lot_id': pesee.lot_id,
+            'date_pesee': pesee.date_pesee,
+            'poids_moyen': pesee.poids_moyen,
+            'poids_total': pesee.poids_total
+        } for pesee in pesees])
         
         # Préparer les données spécifiques
-        self._prepare_data(data, controles_ponte, performances)
+        self._prepare_data(lots_df, controles_ponte_df, performances_df, pesees_df)
+    
+    def _prepare_data(self, lots_df: pd.DataFrame, controles_ponte_df: pd.DataFrame, 
+                     performances_df: pd.DataFrame, pesees_df: pd.DataFrame):
+        """Prépare les données pour l'entraînement."""
+        # Encoder les variables catégorielles
+        categorical_cols = ['type_volaille', 'type_production', 'systeme_elevage', 'statut']
+        for col in categorical_cols:
+            if col in lots_df.columns:
+                le = LabelEncoder()
+                lots_df[col] = le.fit_transform(lots_df[col].astype(str))
+                self.label_encoders[col] = le
         
+        # Préparer les datasets spécifiques
+        self.ponte_data = self._prepare_ponte_data(lots_df, controles_ponte_df)
+        self.croissance_data = self._prepare_croissance_data(lots_df, performances_df)
+        self.poids_data = self._prepare_poids_data(lots_df, pesees_df)
+    
+    def _prepare_ponte_data(self, lots_df: pd.DataFrame, controles_ponte_df: pd.DataFrame) -> pd.DataFrame:
+        """Prépare les données pour le modèle de ponte."""
+        merged = pd.merge(lots_df, controles_ponte_df, left_on='id', right_on='lot_id')
+        
+        # Calculer l'âge du lot au moment du contrôle
+        if 'date_mise_en_place' in merged.columns and 'date_controle' in merged.columns:
+            merged['jours_en_production'] = (
+                pd.to_datetime(merged['date_controle']) - 
+                pd.to_datetime(merged['date_mise_en_place'])
+            ).dt.days
+        
+        # Sélectionner les colonnes pertinentes
+        features = [
+            'type_volaille', 'type_production', 'systeme_elevage', 'souche',
+            'jours_en_production', 'effectif_initial', 'statut'
+        ]
+        features = [f for f in features if f in merged.columns]
+        
+        return merged[features + ['taux_ponte', 'nombre_oeufs']].dropna()
+    
+    def _prepare_croissance_data(self, lots_df: pd.DataFrame, performances_df: pd.DataFrame) -> pd.DataFrame:
+        """Prépare les données pour le modèle de croissance."""
+        merged = pd.merge(lots_df, performances_df, left_on='id', right_on='lot_id')
+        
+        # Calculer l'âge du lot au moment du contrôle
+        if 'date_mise_en_place' in merged.columns and 'date_controle' in merged.columns:
+            merged['jours_en_elevage'] = (
+                pd.to_datetime(merged['date_controle']) - 
+                pd.to_datetime(merged['date_mise_en_place'])
+            ).dt.days
+        
+        # Sélectionner les colonnes pertinentes
+        features = [
+            'type_volaille', 'type_production', 'systeme_elevage', 'souche',
+            'jours_en_elevage', 'effectif_initial', 'statut'
+        ]
+        features = [f for f in features if f in merged.columns]
+        
+        return merged[features + ['poids_moyen', 'gain_moyen_journalier']].dropna()
+    
+    def _prepare_poids_data(self, lots_df: pd.DataFrame, pesees_df: pd.DataFrame) -> pd.DataFrame:
+        """Prépare les données pour le modèle de poids."""
+        merged = pd.merge(lots_df, pesees_df, left_on='id', right_on='lot_id')
+        
+        # Calculer l'âge du lot au moment de la pesée
+        if 'date_mise_en_place' in merged.columns and 'date_pesee' in merged.columns:
+            merged['jours_en_elevage'] = (
+                pd.to_datetime(merged['date_pesee']) - 
+                pd.to_datetime(merged['date_mise_en_place'])
+            ).dt.days
+        
+        # Sélectionner les colonnes pertinentes
+        features = [
+            'type_volaille', 'type_production', 'systeme_elevage', 'souche',
+            'jours_en_elevage', 'effectif_initial', 'statut'
+        ]
+        features = [f for f in features if f in merged.columns]
+        
+        return merged[features + ['poids_moyen', 'poids_total']].dropna()
+
     async def prepare_training_data(self):
         """Prépare les données d'entraînement (choisit automatiquement le mode)."""
         if self.is_async:
             await self.prepare_training_data_async()
         else:
             self.prepare_training_data_sync()
-    
-    def _prepare_data(self, data: pd.DataFrame, controles_ponte: pd.DataFrame, performances: pd.DataFrame):
-        """Prépare les données pour l'entraînement."""
-        # Encoder les variables catégorielles
-        categorical_cols = ['type_volaille', 'type_production', 'systeme_elevage', 'sexe', 'statut']
-        for col in categorical_cols:
-            if col in data.columns:
-                le = LabelEncoder()
-                data[col] = le.fit_transform(data[col])
-                self.label_encoders[col] = le
         
-        # Calculer l'âge des volailles
-        data['age'] = (datetime.datetime.now() - pd.to_datetime(data['date_naissance'])).dt.days
-        
-        # Préparer les datasets spécifiques
-        self.ponte_data = self._prepare_ponte_data(data, controles_ponte)
-        self.croissance_data = self._prepare_croissance_data(data, performances)
-    
-    def _prepare_ponte_data(self, data: pd.DataFrame, controles_ponte: pd.DataFrame) -> pd.DataFrame:
-        """Prépare les données pour le modèle de ponte."""
-        # Implémentation de la logique de préparation des données de ponte
-        merged = pd.merge(data, controles_ponte, left_on='id', right_on='lot_id')
-        # Ajouter ici les transformations spécifiques
-        return merged.dropna()
-    
-    def _prepare_croissance_data(self, data: pd.DataFrame, performances: pd.DataFrame) -> pd.DataFrame:
-        """Prépare les données pour le modèle de croissance."""
-        # Implémentation de la logique de préparation des données de croissance
-        merged = pd.merge(data, performances, left_on='id', right_on='lot_id')
-        # Ajouter ici les transformations spécifiques
-        return merged.dropna()
-    
     async def train_models(self):
         """Entraîne tous les modèles et enregistre leurs performances."""
-        if self.ponte_data is None or self.croissance_data is None:
+        if self.ponte_data is None or self.croissance_data is None or self.poids_data is None:
             await self.prepare_training_data()
             
         await self.train_ponte_model()
         await self.train_croissance_model()
+        await self.train_poids_model()
     
     async def train_ponte_model(self):
         """Entraîne un modèle pour prédire la ponte."""
@@ -185,6 +311,20 @@ class AvicolePredictor:
         self._evaluate_and_store_performance(
             "GainModel", self.gain_model, X_test, y_test_gain)
     
+    async def train_poids_model(self):
+        """Entraîne un modèle pour prédire le poids moyen."""
+        X = self.poids_data.drop(['poids_moyen', 'poids_total'], axis=1)
+        y_poids = self.poids_data['poids_moyen']
+        
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y_poids, test_size=0.2, random_state=42)
+        
+        self.poids_pesee_model = GradientBoostingRegressor(n_estimators=100)
+        self.poids_pesee_model.fit(X_train, y_train)
+        
+        self._evaluate_and_store_performance(
+            "PoidsPeseeModel", self.poids_pesee_model, X_test, y_test)
+
     def _evaluate_and_store_performance(self, model_name: str, model, X_test, y_test):
         """Évalue un modèle et stocke ses performances."""
         y_pred = model.predict(X_test)
@@ -221,49 +361,67 @@ class AvicolePredictor:
         
         return asdict(best_model)
     
-    async def predict_ponte_async(self, volaille_data: Dict[str, Any]) -> Dict[str, float]:
+    async def predict_ponte_async(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
         """Prédit le taux de ponte et le nombre d'œufs (mode asynchrone)."""
-        return await self._predict_wrapper(self._predict_ponte, volaille_data)
+        return await self._predict_wrapper(self._predict_ponte, lot_data)
     
-    def predict_ponte_sync(self, volaille_data: Dict[str, Any]) -> Dict[str, float]:
+    def predict_ponte_sync(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
         """Prédit le taux de ponte et le nombre d'œufs (mode synchrone)."""
-        return self._predict_ponte(volaille_data)
+        return self._predict_ponte(lot_data)
     
-    async def predict_croissance_async(self, volaille_data: Dict[str, Any]) -> Dict[str, float]:
+    async def predict_croissance_async(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
         """Prédit la croissance (mode asynchrone)."""
-        return await self._predict_wrapper(self._predict_croissance, volaille_data)
+        return await self._predict_wrapper(self._predict_croissance, lot_data)
     
-    def predict_croissance_sync(self, volaille_data: Dict[str, Any]) -> Dict[str, float]:
+    def predict_croissance_sync(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
         """Prédit la croissance (mode synchrone)."""
-        return self._predict_croissance(volaille_data)
+        return self._predict_croissance(lot_data)
+    
+    async def predict_poids_async(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
+        """Prédit le poids moyen (mode asynchrone)."""
+        return await self._predict_wrapper(self._predict_poids, lot_data)
+    
+    def predict_poids_sync(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
+        """Prédit le poids moyen (mode synchrone)."""
+        return self._predict_poids(lot_data)
     
     async def _predict_wrapper(self, predict_func, *args, **kwargs):
         """Wrapper pour exécuter des prédictions en mode asynchrone."""
-        # Cette méthode permet de gérer les opérations asynchrones si nécessaire
         return predict_func(*args, **kwargs)
     
-    def _predict_ponte(self, volaille_data: Dict[str, Any]) -> Dict[str, float]:
+    def _predict_ponte(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
         """Implémentation synchrone de la prédiction de ponte."""
         if not self.ponte_rate_model or not self.oeufs_count_model:
             raise ValueError("Models not trained. Call train_ponte_model first.")
             
-        input_data = self._prepare_input(volaille_data, 'ponte')
+        input_data = self._prepare_input(lot_data, 'ponte')
         
         return {
             'taux_ponte': float(self.ponte_rate_model.predict(input_data)[0]),
             'nombre_oeufs': float(self.oeufs_count_model.predict(input_data)[0])
         }
     
-    def _predict_croissance(self, volaille_data: Dict[str, Any]) -> Dict[str, float]:
+    def _predict_croissance(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
         """Implémentation synchrone de la prédiction de croissance."""
         if not self.poids_model or not self.gain_model:
             raise ValueError("Models not trained. Call train_croissance_model first.")
             
-        input_data = self._prepare_input(volaille_data, 'croissance')
+        input_data = self._prepare_input(lot_data, 'croissance')
         
         return {
             'poids_moyen': float(self.poids_model.predict(input_data)[0]),
             'gain_moyen_journalier': float(self.gain_model.predict(input_data)[0])
+        }
+    
+    def _predict_poids(self, lot_data: Dict[str, Any]) -> Dict[str, float]:
+        """Implémentation synchrone de la prédiction de poids."""
+        if not self.poids_pesee_model:
+            raise ValueError("Model not trained. Call train_poids_model first.")
+            
+        input_data = self._prepare_input(lot_data, 'poids')
+        
+        return {
+            'poids_moyen': float(self.poids_pesee_model.predict(input_data)[0])
         }
     
     def _prepare_input(self, data: Dict[str, Any], model_type: str) -> pd.DataFrame:
@@ -272,14 +430,14 @@ class AvicolePredictor:
         
         for col, le in self.label_encoders.items():
             if col in df.columns:
-                df[col] = le.transform(df[col])
+                df[col] = le.transform(df[col].astype(str))
         
-        if model_type == 'ponte' and 'date_mise_en_production' in df.columns:
+        if model_type == 'ponte' and 'date_mise_en_place' in df.columns and 'date_controle' in df.columns:
             df['jours_en_production'] = (
                 pd.to_datetime(df['date_controle']) - 
-                pd.to_datetime(df['date_mise_en_production'])
+                pd.to_datetime(df['date_mise_en_place'])
             ).dt.days
-        elif model_type == 'croissance' and 'date_mise_en_place' in df.columns:
+        elif model_type in ['croissance', 'poids'] and 'date_mise_en_place' in df.columns and 'date_controle' in df.columns:
             df['jours_en_elevage'] = (
                 pd.to_datetime(df['date_controle']) - 
                 pd.to_datetime(df['date_mise_en_place'])
@@ -294,21 +452,20 @@ class AvicolePredictor:
         Args:
             filename: Nom du fichier de sauvegarde (par défaut: 'avicole_model.joblib')
         """                
-        # Chemin complet du fichier
         filepath = MODELS_DIR / filename
         
-        # Sauvegarde des modèles
         dump({
             'models': {
                 'ponte_rate': self.ponte_rate_model,
                 'oeufs_count': self.oeufs_count_model,
                 'poids': self.poids_model,
-                'gain': self.gain_model
+                'gain': self.gain_model,
+                'poids_pesee': self.poids_pesee_model
             },
             'encoders': self.label_encoders
         }, filepath)
         
-        return str(filepath)  # Retourne le chemin complet pour information
+        return str(filepath)
 
     def load_model(self, filename: str = "avicole_model.joblib"):
         """
@@ -322,19 +479,17 @@ class AvicolePredictor:
         """
         filepath = MODELS_DIR / filename
         
-        # Vérification que le fichier existe
         if not filepath.exists():
             raise FileNotFoundError(f"Le fichier de modèle {filepath} n'existe pas")
         
-        # Chargement des données
         data = load(filepath)
         models = data['models']
         
-        # Attribution des modèles
         self.ponte_rate_model = models['ponte_rate']
         self.oeufs_count_model = models['oeufs_count']
         self.poids_model = models['poids']
         self.gain_model = models['gain']
+        self.poids_pesee_model = models.get('poids_pesee')
         self.label_encoders = data['encoders']
         
-        return self  # Pour permettre le chaînage
+        return self

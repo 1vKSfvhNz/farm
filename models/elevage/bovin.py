@@ -1,10 +1,17 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, Text, Date, ForeignKey, Enum as SqlEnum
+from sqlalchemy import Column, Integer, String, Boolean, Float, Text, Date, ForeignKey, Enum as SqlEnum, Table
 from sqlalchemy.orm import relationship
 from models import Base
 from enums import SexeEnum
 from models.elevage import Animal, TypeElevage
 from enums.elevage.bovin import StatutReproductionBovinEnum, TypeProductionBovinEnum
 
+# Définition de la table d'association pour la relation many-to-many entre Velage et Bovin
+velages_veaux = Table(
+    'velages_veaux',
+    Base.metadata,
+    Column('velage_id', Integer, ForeignKey('velages.id'), primary_key=True),
+    Column('veau_id', Integer, ForeignKey('bovins.id'), primary_key=True)
+)
 
 class Bovin(Animal):
     __tablename__ = 'bovins'
@@ -23,6 +30,7 @@ class Bovin(Animal):
     # Relations spécifiques
     velages = relationship("Velage", back_populates="mere")
     controles_qualite_lait = relationship("ControleQualiteLaitBovin", back_populates="bovin")
+    naissance = relationship("Velage", secondary='velages_veaux', back_populates="veaux")
     
     __mapper_args__ = {
         'polymorphic_identity': TypeElevage.BOVIN
@@ -44,8 +52,7 @@ class Velage(Base):
     notes = Column(Text)
     
     mere = relationship("Bovin", back_populates="velages")
-    veaux = relationship("Bovin", secondary='velages_veaux', back_populates="naissance")
-
+    veaux = relationship("Bovin", secondary=velages_veaux, back_populates="naissance")
 
 class ControleQualiteLaitBovin(Base):
     __tablename__ = 'controles_qualite_lait_bovin'

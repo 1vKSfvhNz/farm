@@ -1,5 +1,6 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score, precision_score, recall_score, f1_score
@@ -55,29 +56,42 @@ class PisciculturePredictor:
         if model_path:
             self.load_model(model_path)
     
-    async def prepare_data_async(self, target: str = 'croissance') -> tuple:
+    # Modifier la méthode prepare_training_data_async
+    async def prepare_training_data_async(self, target: str = 'croissance') -> tuple:
         """Version asynchrone de la préparation des données"""
-        query = """
-        SELECT 
-            c.id, c.date_controle, c.temperature, c.ph, c.oxygene_dissous,
-            c.ammoniac, c.nitrites, c.nitrates, c.salinite, c.turbidite,
-            c.qualite_eau, c.bassin_id,
-            b.volume,
-            COUNT(p.id) as nombre_poissons,
-            AVG(r.poids_moyen) as poids_moyen_recolte,
-            MIN(p.poids_ensemencement) as poids_ensemencement,
-            MIN(p.date_ensemencement) as date_ensemencement
-        FROM controles_eau c
-        LEFT JOIN bassins_piscicole b ON c.bassin_id = b.id
-        LEFT JOIN poissons p ON p.bassin_id = c.bassin_id
-        LEFT JOIN recoltes_poisson r ON r.bassin_id = c.bassin_id
-        GROUP BY c.id, b.id
-        """
-        
-        df = await self.loader.execute_query(query)
-        return self._process_data(df, target)
+        if not self.db_session or not self.is_async:
+            raise ValueError("Async DB session must be set to prepare training data")
+            
+        try:
+            query = """
+            SELECT 
+                c.id, c.date_controle, c.temperature, c.ph, c.oxygene_dissous,
+                c.ammoniac, c.nitrites, c.nitrates, c.salinite, c.turbidite,
+                c.qualite_eau, c.bassin_id,
+                b.volume,
+                COUNT(p.id) as nombre_poissons,
+                AVG(r.poids_moyen) as poids_moyen_recolte,
+                MIN(p.poids_ensemencement) as poids_ensemencement,
+                MIN(p.date_ensemencement) as date_ensemencement
+            FROM controles_eau c
+            LEFT JOIN bassins_piscicole b ON c.bassin_id = b.id
+            LEFT JOIN poissons p ON p.bassin_id = c.bassin_id
+            LEFT JOIN recoltes_poisson r ON r.bassin_id = c.bassin_id
+            GROUP BY c.id, b.id
+            """
+            
+            result = await self.db_session.execute(text(query))
+            rows = result.fetchall()
+            
+            # Conversion en DataFrame
+            df = pd.DataFrame(rows, columns=result.keys())
+            return self._process_data(df, target)
+        except Exception as e:
+            if self.db_session:
+                await self.db_session.rollback()
+            raise e
     
-    def prepare_data_sync(self, target: str = 'croissance') -> tuple:
+    def prepare_training_data_sync(self, target: str = 'croissance') -> tuple:
         """Version synchrone de la préparation des données"""
         query = """
         SELECT 
@@ -96,7 +110,7 @@ class PisciculturePredictor:
         GROUP BY c.id, b.id
         """
         
-        df = self.loader.execute_query(query)
+        df = self.loader.execute_query(text(query))
         return self._process_data(df, target)
         
     def _process_data(self, df: pd.DataFrame, target: str):
@@ -136,8 +150,8 @@ class PisciculturePredictor:
     def prepare_data(self, target: str = 'croissance') -> tuple:
         """Charge les données en fonction du mode"""
         if self.is_async:
-            return self.prepare_data_async(target)
-        return self.prepare_data_sync(target)
+            return self.prepare_training_data_async(target)
+        return self.prepare_training_data_sync(target)
     
     def _determiner_phase_elevage(self, date_controle: datetime, date_ensemencement: datetime) -> Optional[PhaseElevage]:
         """Détermine la phase d'élevage basée sur la durée depuis l'ensemencement."""

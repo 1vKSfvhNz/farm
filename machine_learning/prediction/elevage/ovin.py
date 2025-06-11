@@ -11,6 +11,7 @@ from joblib import dump, load
 from machine_learning.base import ModelPerformance
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from models import DatabaseLoader
 from pathlib import Path
 
@@ -66,36 +67,49 @@ class OvinProductionPredictor:
         if model_path:
             self.load_models(model_path)
     
-    async def load_historical_data_async(self) -> List[OvinPredictionInput]:
+    # Modifier la méthode prepare_training_data_async
+    async def prepare_training_data_async(self) -> List[OvinPredictionInput]:
         """Charge les données historiques en mode asynchrone"""
-        query = """
-        SELECT 
-            a.id as animal_id,
-            a.date_naissance,
-            a.sexe,
-            r.nom as race,
-            r.caracteristiques,
-            t.date_tonte,
-            t.poids_laine,
-            t.qualite_laine,
-            m.date_mise_bas,
-            m.nombre_agneaux
-        FROM 
-            animaux a
-        JOIN 
-            races r ON a.race_id = r.id
-        LEFT JOIN 
-            tontes_ovin t ON a.id = t.animal_id
-        LEFT JOIN 
-            mises_bas m ON a.id = m.animal_id
-        WHERE 
-            a.type = 'OVIN'
-        """
-        
-        df = await self.loader.execute_query(query)
-        return self._convert_to_prediction_inputs(df)
+        if not self.db_session or not self.is_async:
+            raise ValueError("Async DB session must be set to prepare training data")
+            
+        try:
+            query = """
+            SELECT 
+                a.id as animal_id,
+                a.date_naissance,
+                a.sexe,
+                r.nom as race,
+                r.caracteristiques,
+                t.date_tonte,
+                t.poids_laine,
+                t.qualite_laine,
+                m.date_mise_bas,
+                m.nombre_agneaux
+            FROM 
+                animaux a
+            JOIN 
+                races r ON a.race_id = r.id
+            LEFT JOIN 
+                tontes t ON a.id = t.animal_id
+            LEFT JOIN 
+                mises_bas m ON a.id = m.animal_id
+            WHERE 
+                a.type = 'OVIN'
+            """
+            
+            result = await self.db_session.execute(text(query))
+            rows = result.fetchall()
+            
+            # Conversion en DataFrame
+            df = pd.DataFrame(rows, columns=result.keys())
+            return self._convert_to_prediction_inputs(df)
+        except Exception as e:
+            if self.db_session:
+                await self.db_session.rollback()
+            raise e
     
-    def load_historical_data_sync(self) -> List[OvinPredictionInput]:
+    def prepare_training_data_sync(self) -> List[OvinPredictionInput]:
         """Charge les données historiques en mode synchrone"""
         query = """
         SELECT 
@@ -121,7 +135,7 @@ class OvinProductionPredictor:
             a.type = 'OVIN'
         """
         
-        df = self.loader.execute_query(query)
+        df = self.loader.execute_query(text(query))
         return self._convert_to_prediction_inputs(df)
     
     def _convert_to_prediction_inputs(self, df: pd.DataFrame) -> List[OvinPredictionInput]:

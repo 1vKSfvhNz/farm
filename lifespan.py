@@ -103,7 +103,7 @@ async def train_caprin_model_async():
     """Entraîne le modèle caprin (version asynchrone)"""
     async with get_async_db_session() as session:
         predictor = CaprinProductionPredictor(db_session=session)
-        data = await predictor.load_data_async()
+        data = await predictor.prepare_training_data_async()
         X, y = predictor.preprocess_data(data)
         predictor.train_model(X, y)
         predictors['caprin'] = predictor
@@ -113,7 +113,7 @@ async def train_ovin_model_async():
     """Entraîne le modèle ovin (version asynchrone)"""
     async with get_async_db_session() as session:
         predictor = OvinProductionPredictor(db_session=session)
-        data = await predictor.load_historical_data_async()
+        data = await predictor.prepare_training_data_async()
         predictor.train_production_laine_model(data)
         predictor.train_production_agneaux_model(data)
         predictors['ovin'] = predictor
@@ -153,7 +153,7 @@ def train_caprin_model_sync():
     """Entraîne le modèle caprin (version synchrone)"""
     with get_db_session() as session:
         predictor = CaprinProductionPredictor(db_session=session)
-        data = predictor.load_data_sync()
+        data = predictor.prepare_training_data_sync()
         X, y = predictor.preprocess_data(data)
         predictor.train_model(X, y)
         predictors['caprin'] = predictor
@@ -163,7 +163,7 @@ def train_ovin_model_sync():
     """Entraîne le modèle ovin (version synchrone)"""
     with get_db_session() as session:
         predictor = OvinProductionPredictor(db_session=session)
-        data = predictor.load_historical_data_sync()  # Vous devrez implémenter cette méthode
+        data = predictor.prepare_training_data_sync()  # Vous devrez implémenter cette méthode
         predictor.train_production_laine_model(data)
         predictor.train_production_agneaux_model(data)
         predictors['ovin'] = predictor
@@ -173,7 +173,7 @@ def train_piscicole_model_sync():
     """Entraîne le modèle piscicole (version synchrone)"""
     with get_db_session() as session:
         predictor = PisciculturePredictor(db_session=session)
-        predictor.prepare_data_sync('croissance')  # Vous devrez implémenter cette méthode
+        predictor.prepare_training_data_sync('croissance')  # Vous devrez implémenter cette méthode
         predictor.train_models('croissance')
         predictors['piscicole'] = predictor
     return True
@@ -263,11 +263,11 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Scheduler démarré avec succès")
         
         # Planification de l'entraînement mensuel
-        if not schedule_monthly_training():
-            logger.warning("⚠️ La planification mensuelle a échoué")
+#        if not schedule_monthly_training():
+#            logger.warning("⚠️ La planification mensuelle a échoué")
         
         # Tentative d'entraînement initial en mode asynchrone
-        await train_all_models_async()
+#        await train_all_models_async()
         
         yield
         

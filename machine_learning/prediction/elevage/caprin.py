@@ -12,6 +12,7 @@ from datetime import datetime
 from machine_learning.base import ModelPerformance
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import Optional, Union, Dict
 from joblib import dump, load
 from models import DatabaseLoader, get_async_db_session
@@ -60,11 +61,13 @@ class CaprinProductionPredictor:
         if model_path:
             self.load_model(model_path)
     
-    async def load_data_async(self) -> pd.DataFrame:
+    # Modifier la méthode prepare_training_data_async
+    async def prepare_training_data_async(self) -> pd.DataFrame:
         """
         Charge les données depuis la base de données en mode asynchrone
         """
-        query = """
+        try:
+            query = """
             SELECT 
                 c.id,
                 c.periode_lactation,
@@ -75,24 +78,23 @@ class CaprinProductionPredictor:
                 cl.production_journaliere,
                 cl.taux_matiere_grasse,
                 cl.taux_proteine,
-                a.date_naissance,
-                COUNT(DISTINCT i.id) as nombre_mises_bas
+                a.date_naissance
             FROM 
                 caprins c
             JOIN 
                 animaux a ON c.id = a.id
             JOIN 
                 controles_laitiers_caprin cl ON c.id = cl.caprin_id
-            LEFT JOIN 
-                inseminations i ON a.id = i.animal_id AND i.resultat = 'POSITIF'
-            GROUP BY 
-                c.id, cl.id, a.id
-        """
+            """
+            
+            df = await self.loader.execute_query(text(query))
+            return self._process_data(df)
+        except Exception as e:
+            if self.db_session:
+                await self.db_session.rollback()
+            raise e
         
-        df = await self.loader.execute_query(query)
-        return self._process_data(df)
-        
-    def load_data_sync(self) -> pd.DataFrame:
+    def prepare_training_data_sync(self) -> pd.DataFrame:
         """
         Charge les données depuis la base de données en mode synchrone
         """
@@ -121,7 +123,7 @@ class CaprinProductionPredictor:
                 c.id, cl.id, a.id
         """
         
-        df = self.loader.execute_query(query)
+        df = self.loader.execute_query(text(query))
         return self._process_data(df)
     
     def _process_data(self, df: pd.DataFrame) -> pd.DataFrame:

@@ -22,11 +22,19 @@ from enums.elevage.bovin import TypeProductionBovinEnum, StatutReproductionBovin
 from enums.elevage import StatutAnimalEnum
 from machine_learning.analyse.elevage.bovin import BovinAnalysis
 from machine_learning.prediction.elevage.bovin import BovinProductionPredictor
-from utils.security import get_current_user
-from api import check_permissions, IMAGE_EXTENSIONS, UPLOAD_IMAGE_DIR_Bovin
+from utils.security import get_current_manager
+from api import check_permissions_manager, IMAGE_EXTENSIONS, UPLOAD_IMAGE_DIR_Bovin
 import logging
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/elevage/bovin",
+    tags=["Élevage Bovin"],
+    responses={
+        404: {"description": "Non trouvé"},
+        403: {"description": "Accès refusé"},
+        401: {"description": "Non authentifié"}
+    },
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +47,7 @@ async def create_bovin(
     bovin: BovinCreate,
     image_file: UploadFile = File(...),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Crée un nouveau bovin dans le système avec validation avancée.
@@ -53,7 +61,7 @@ async def create_bovin(
         "robe": "Noire et blanche"
     }
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         # Validation supplémentaire
@@ -100,13 +108,13 @@ async def create_bovin(
 def get_bovin(
     bovin_id: int,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les informations détaillées d'un bovin spécifique avec ses relations.
     Inclut les informations de production, reproduction et santé.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         bovin = db.query(Bovin).options(
@@ -138,7 +146,7 @@ def list_bovins(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=500),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Liste tous les bovins avec pagination, filtres avancés et tri.
@@ -151,7 +159,7 @@ def list_bovins(
     - date_naissance_min/max: Plage de dates
     - lot_id: ID du lot
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         query = db.query(Bovin).options(
@@ -212,12 +220,12 @@ def update_bovin(
     bovin_data: BovinUpdate,
     image_file: UploadFile = File(...),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Met à jour les informations d'un bovin avec validation avancée.
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         bovin = db.query(Bovin).filter(Bovin.id == bovin_id).first()
@@ -278,7 +286,7 @@ def update_bovin(
 def create_production_lait(
     production: ProductionLaitCreate,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Enregistre une production laitière avec validation des données.
@@ -288,7 +296,7 @@ def create_production_lait(
     - La date n'est pas dans le futur
     - La quantité est positive
     """
-    check_permissions(db, current_user, required_roles=['admin', 'elevage', 'traite'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'elevage', 'traite'])
     
     try:
         # Validation de l'animal
@@ -336,7 +344,7 @@ def get_production_stats(
     start_date: date = Query(..., description="Date de début de la période"),
     end_date: date = Query(..., description="Date de fin de la période"),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les statistiques de production laitière pour un bovin sur une période donnée.
@@ -348,7 +356,7 @@ def get_production_stats(
     - pire jour de production
     - tendance
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         # Validation de la période
@@ -434,7 +442,7 @@ def get_production_stats(
 def create_controle_laitier(
     controle: ControleLaitierCreate,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Enregistre un contrôle laitier avec validation des paramètres.
@@ -444,7 +452,7 @@ def create_controle_laitier(
     - Les taux sont dans des plages réalistes
     - Les cellules somatiques sont positives
     """
-    check_permissions(db, current_user, required_roles=['admin', 'elevage', 'qualite'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'elevage', 'qualite'])
     
     try:
         # Validation de l'animal
@@ -503,7 +511,7 @@ def create_controle_laitier(
 def create_velage(
     velage: VelageCreate,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Enregistre un vêlage avec mise à jour automatique du statut de la mère.
@@ -513,7 +521,7 @@ def create_velage(
     - La date n'est pas dans le futur
     - La facilité de vêlage est entre 1 et 5
     """
-    check_permissions(db, current_user, required_roles=['admin', 'elevage', 'reproduction'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'elevage', 'reproduction'])
     
     try:
         # Validation de la mère
@@ -575,14 +583,14 @@ def get_alertes(
     severity: Optional[str] = Query(None, description="Filtrer par sévérité (LOW, MEDIUM, HIGH, CRITICAL)"),
     bovin_id: Optional[int] = Query(None, description="Filtrer par ID de bovin"),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les alertes pour l'élevage bovin avec filtres avancés.
     
     Les alertes sont triées par sévérité (CRITICAL en premier).
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         analyzer = BovinAnalysis(db)
@@ -613,7 +621,7 @@ def get_alertes(
 def get_animal_summary(
     bovin_id: int,
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère un résumé complet pour un bovin spécifique.
@@ -625,7 +633,7 @@ def get_animal_summary(
     - Alertes actives
     - Recommandations
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         analyzer = BovinAnalysis(db)
@@ -651,7 +659,7 @@ def get_animal_summary(
 @router.get("/model-performance", response_model=PerformanceModel)
 def get_model_performance(
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les métriques de performance du modèle de prédiction.
@@ -662,7 +670,7 @@ def get_model_performance(
     - Erreur quadratique moyenne (MSE)
     - Score de validation croisée
     """
-    check_permissions(db, current_user, required_roles=['admin', 'technicien'])
+    check_permissions_manager(db, current_user, required_roles=['admin', 'technicien'])
     
     try:
         predictor = BovinProductionPredictor()
@@ -694,7 +702,7 @@ def get_milk_production_stats(
     race_id: Optional[int] = Query(None, description="Filtrer par ID de race"),
     lot_id: Optional[int] = Query(None, description="Filtrer par ID de lot"),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les statistiques avancées de production laitière pour une période.
@@ -705,7 +713,7 @@ def get_milk_production_stats(
     - Top 5 des meilleurs producteurs
     - Paramètres de qualité moyens
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         # Validation de la période
@@ -808,7 +816,7 @@ def get_reproduction_stats(
     start_date: date = Query(..., description="Date de début de la période"),
     end_date: date = Query(..., description="Date de fin de la période"),
     db: Session = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_manager)
 ):
     """
     Récupère les statistiques avancées de reproduction pour une période.
@@ -819,7 +827,7 @@ def get_reproduction_stats(
     - Nombre de vêlages
     - Répartition des difficultés de vêlage
     """
-    check_permissions(db, current_user)
+    check_permissions_manager(db, current_user)
     
     try:
         # Validation de la période

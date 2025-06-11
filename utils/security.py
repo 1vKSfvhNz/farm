@@ -10,6 +10,7 @@ from jwt import ExpiredSignatureError, PyJWTError, DecodeError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
+
 load_dotenv()
 
 ph = PasswordHasher()
@@ -28,7 +29,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM), expire
 
 # Ajoutez cette fonction dans utils/security.py
-def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+def get_current_client(token: str = Depends(oauth2_scheme)) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -36,6 +37,25 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         if email is None:
             raise ValueError("Invalid token - missing sub claim")
         return {"email": email, "id": id}
+    except DecodeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide ou mal formé.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except ExpiredSignatureError:
+        raise ValueError("Token expired")
+    except PyJWTError as e:
+        raise ValueError(f"Invalid token: {str(e)}")
+
+def get_current_manager(token: str = Depends(oauth2_scheme)) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        phone: str = payload.get("sub")
+        id: str = payload.get("id")
+        if phone is None:
+            raise ValueError("Invalid token - missing sub claim")
+        return {"phone": phone, "id": id}
     except DecodeError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -93,4 +113,5 @@ def verify_passw(password: str, hashed_password: str) -> bool:
         return ph.verify(hashed_password, password)
     except:
         return False
+
 
