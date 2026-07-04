@@ -1,0 +1,38 @@
+# Mettre à jour les paquets
+sudo apt update
+
+# Installer PostgreSQL
+sudo apt install postgresql postgresql-contrib
+
+# Vérifier le statut
+sudo systemctl status postgresql
+
+# Vérifier que PostgreSQL tourne
+sudo systemctl status postgresql
+
+# Créer la base de données si elle n'existe pas
+sudo -u postgres createdb farm_manager
+
+# Créer l'utilisateur (si nécessaire)
+sudo -u postgres psql -c "CREATE USER farm_user WITH PASSWORD 'wxcvbnjklm';"
+
+# Donner les droits
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE farm_manager TO farm_user;"
+
+sudo -u postgres psql -d farm_manager
+GRANT ALL ON SCHEMA public TO farm_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO farm_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO farm_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO farm_user;
+\q
+
+alembic revision --autogenerate -m "Initial"
+alembic upgrade head
+
+pip install sqlalchemy fastapi alembic passlib PyJWT pydantic_settings redis pydantic[email] Pillow httpx uvicorn alembic psycopg2-binary asyncpg
+
+cd ~
+mkdir farm_manager
+cd farm_manager
+cp -r /mnt/c/Users/User/Desktop/Projets/ferme/farm_manager/backend .
+cd backend

@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+.env
+*.log
+*.pid
+
+# Database
+*.db
+*.sqlite
+
+# Uploads
+uploads/*/
+!uploads/.gitkeep
+
+# Docker
+docker-compose.override.yml
+
+# Frontend
+node_modules/
+dist/
+build/
+.svelte-kit/
+.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,13 @@
+// lib/stores/index.ts - Mise à jour
+export { authStore } from './auth';
+export { notificationStore } from './notifications';
+export { alertStore } from './alerts';
+export { experimentalStore } from './experimental';
+export { animalStore } from './animal';
+export { enclosStore } from './enclos';
+export { financialStore } from './financial';
+export { uiStore } from './ui';
+export { dashboardStore } from './dashboard';
+export { reportStore } from './reports';
+export { websocketStore } from './websocket';
+export { chartsStore } from './charts';

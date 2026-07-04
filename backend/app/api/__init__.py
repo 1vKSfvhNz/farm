@@ -1,0 +1,58 @@
+# backend/app/api/__init__.py
+"""
+Package API - Routes versionnées de l'application
+"""
+
+from .v1 import (
+    apiary,
+    auth,
+    media,
+    users,
+    enclos,
+    vaccination,
+    compost,
+    bovins,
+    ovins,
+    caprins,
+    avicoles,
+    piscicoles,
+    entomoculture,
+    accounting,
+    dashboard,
+    predictions,
+    alerts,
+    exports,
+    water_quality,
+    weather,
+    bea,
+    blockchain,
+    odoni,
+    experimental,
+)
+
+__all__ = [
+    "auth",
+    "users",
+    "enclos",
+    "vaccination",
+    "compost",
+    "bovins",
+    "ovins",
+    "caprins",
+    "avicoles",
+    "piscicoles",
+    "entomoculture",
+    "accounting",
+    "dashboard",
+    "predictions",
+    "alerts",
+    "exports",
+    "water_quality",
+    "media",
+    "weather",
+    "bea",
+    "blockchain",
+    "odoni",
+    "apiary",
+    "experimental",
+]

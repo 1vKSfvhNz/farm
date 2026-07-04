@@ -1,0 +1,15 @@
+-- ================================================================================
+-- FICHIER 10: 10_cleanup.sql
+-- Script de nettoyage (optionnel)
+-- ================================================================================
+
+-- DELETE FROM references_croissance WHERE source = 'standard';
+-- DELETE FROM references_seuils WHERE source = 'standard';
+-- DELETE FROM references_vaccination WHERE source = 'standard';
+-- DELETE FROM references_nutrition WHERE source = 'standard';
+-- DELETE FROM maladies;
+-- DELETE FROM vaccins;
+-- DELETE FROM rations_alimentaires WHERE source = 'standard';
+-- DELETE FROM productions_references WHERE source = 'standard';
+-- DELETE FROM compost_references WHERE source = 'standard';
+-- DELETE FROM references_hypotheses WHERE source = 'standard';

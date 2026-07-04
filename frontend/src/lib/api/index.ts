@@ -1,0 +1,26 @@
+// lib/api/index.ts
+export { apiClient } from './client';
+export { authApi } from './auth';
+export { usersApi } from './users';
+export { bovinsApi } from './bovins';
+export { ovinsApi } from './ovins';
+export { caprinsApi } from './caprins';
+export { avicolesApi } from './avicoles';
+export { piscicolesApi } from './piscicoles';
+export { apiaryApi } from './apiary';
+export { entomocultureApi } from './entomoculture';
+export { enclosApi } from './enclos';
+export { accountingApi } from './accounting';
+export { vaccinationApi } from './vaccination';
+export { compostApi } from './compost';
+export { peseeApi } from './pesee';
+export { alimentationApi } from './alimentation';
+export { waterQualityApi } from './water_quality';
+export { beaApi } from './bea';
+export { predictionsApi } from './predictions';
+export { alertsApi } from './alerts';
+export { dashboardApi } from './dashboard';
+export { exportsApi } from './exports';
+export { weatherApi } from './weather';
+export { experimentalApi } from './experimental';
+export { videoApi } from './video';
