@@ -1,0 +1,342 @@
+================================================================================
+                    FARM MANAGER - PLATEFORME DE GESTION D'ÉLEVAGE
+                    Version 1.0.0
+================================================================================
+
+📌 DESCRIPTION GÉNÉRALE
+================================================================================
+
+Farm Manager est une plateforme complète de gestion d'exploitation d'élévage 
+connectée. Elle permet aux éleveurs de centraliser et d'optimiser l'ensemble 
+de leurs opérations : suivi du cheptel, santé animale, comptabilité, 
+prédictions IA, qualité de l'eau, et bien-être animal.
+
+La solution est conçue pour les élevages modernes souhaitant digitaliser 
+leurs processus et améliorer leur productivité grâce à des outils 
+intelligents et des données en temps réel.
+
+================================================================================
+🎯 OBJECTIFS DU PROJET
+================================================================================
+
+1. Digitaliser la gestion quotidienne de l'exploitation d'élévage
+2. Centraliser toutes les données (animaux, santé, finances) en un seul endroit
+3. Fournir des prédictions IA pour anticiper les problèmes
+4. Automatiser les rapports et les alertes
+5. Améliorer la traçabilité et la transparence
+6. Optimiser la rentabilité de l'exploitation
+
+================================================================================
+⚙️ FONCTIONNALITÉS PRINCIPALES
+================================================================================
+
+🏷️ 1. GESTION DU CHEPTEL
+   - Bovins, Ovins, Caprins, Avicoles, Piscicoles
+   - Suivi individuel des animaux (identifiant, race, âge, poids)
+   - Gestion des enclos et des parcs
+   - Traçabilité complète des animaux
+
+💉 2. SANTÉ ANIMALE
+   - Gestion des vaccinations et traitements
+   - Suivi vétérinaire
+   - Alertes sanitaires automatiques
+   - Historique médical des animaux
+
+📊 3. BIEN-ÊTRE ANIMAL (BEA)
+   - Indices de confort
+   - Évaluation de l'état de santé
+   - Suivi du comportement animal
+   - Alertes en cas d'anomalies
+
+💰 4. COMPTABILITÉ
+   - Gestion des dépenses et recettes
+   - Calcul de la rentabilité par espèce
+   - Rapports financiers automatiques
+   - Suivi des coûts d'exploitation
+
+🌡️ 5. QUALITÉ DE L'EAU
+   - Suivi des paramètres en temps réel (pH, température, oxygène)
+   - Alertes en cas de seuils critiques
+   - Historique des mesures
+
+🤖 6. PRÉDICTIONS IA
+   - Prédiction de croissance des animaux
+   - Prévision de production (lait, œufs, miel)
+   - Estimation de la rentabilité future
+   - Détection des risques sanitaires
+
+📹 7. VIDÉOSURVEILLANCE
+   - Surveillance en temps réel
+   - Détection des mouvements
+   - Sauvegarde automatique
+
+📈 8. TABLEAU DE BORD
+   - Vue d'ensemble de l'exploitation
+   - Indicateurs clés de performance (KPI)
+   - Graphiques interactifs
+   - Rapports personnalisés
+
+🌤️ 9. MÉTÉO
+   - Intégration API météo
+   - Prévisions pour l'exploitation
+   - Alertes météo
+
+🐝 10. APICULTURE
+   - Gestion des ruches
+   - Suivi de la production de miel
+   - Contrôle de la santé des abeilles
+
+🗑️ 11. COMPOSTAGE
+   - Gestion des déchets
+   - Suivi du compost
+   - Optimisation du recyclage
+
+🔗 12. BLOCKCHAIN (PREMIUM)
+   - Traçabilité de la chaîne d'approvisionnement
+   - Certificats d'authenticité
+   - Transparence des transactions
+
+================================================================================
+🛠️ STACK TECHNOLOGIQUE
+================================================================================
+
+BACKEND :
+   - FastAPI 0.100+      : Framework API REST
+   - SQLAlchemy 2.0+     : ORM asynchrone
+   - PostgreSQL 15+      : Base de données relationnelle
+   - Redis 7+            : Cache et sessions
+   - Alembic 1.18+       : Migrations de base de données
+   - Pydantic 2.0+       : Validation des données
+   - JWT (PyJWT) 2.13+   : Authentification sécurisée
+
+FRONTEND :
+   - SvelteKit 2.0+      : Framework JavaScript
+   - TailwindCSS 3.0+    : Framework CSS
+   - Chart.js 4.0+       : Graphiques interactifs
+   - Skeleton UI         : Composants UI
+
+DEVOPS :
+   - Docker 24+          : Conteneurisation
+   - Docker Compose      : Orchestration des services
+   - GitHub Actions      : CI/CD
+
+SERVICES EXTERNES :
+   - OpenWeatherMap      : Données météo
+   - SMTP                : Envoi d'emails
+   - Twilio              : SMS (optionnel)
+
+================================================================================
+📁 STRUCTURE DU PROJET
+================================================================================
+
+farm_manager/
+├── backend/                    # Backend FastAPI
+│   ├── app/
+│   │   ├── api/               # Routes API
+│   │   │   └── v1/
+│   │   │       ├── auth.py    # Authentification
+│   │   │       ├── users.py   # Utilisateurs
+│   │   │       ├── bovins.py  # Gestion bovins
+│   │   │       ├── ovins.py   # Gestion ovins
+│   │   │       ├── caprins.py # Gestion caprins
+│   │   │       ├── avicoles.py # Gestion avicoles
+│   │   │       ├── piscicoles.py # Gestion piscicoles
+│   │   │       ├── apiary.py  # Apiculture
+│   │   │       ├── accounting.py # Comptabilité
+│   │   │       ├── dashboard.py # Tableau de bord
+│   │   │       ├── predictions.py # Prédictions IA
+│   │   │       ├── alerts.py  # Alertes
+│   │   │       └── ...
+│   │   ├── core/              # Noyau de l'application
+│   │   │   ├── security.py    # Sécurité
+│   │   │   ├── logging.py     # Logs
+│   │   │   └── exceptions.py  # Gestion des erreurs
+│   │   ├── models/            # Modèles SQLAlchemy
+│   │   ├── schemas/           # Schémas Pydantic
+│   │   ├── middleware/        # Middleware
+│   │   ├── config.py          # Configuration
+│   │   ├── database.py        # Connexion DB
+│   │   ├── redis_client.py    # Client Redis
+│   │   ├── lifespan.py        # Cycle de vie
+│   │   └── main.py            # Point d'entrée
+│   ├── migrations/            # Migrations Alembic
+│   ├── tests/                 # Tests unitaires
+│   ├── requirements.txt       # Dépendances Python
+│   └── Dockerfile             # Docker Backend
+├── frontend/                   # Frontend SvelteKit
+│   ├── src/
+│   │   ├── lib/               # Bibliothèques
+│   │   ├── routes/            # Routes SvelteKit
+│   │   ├── app.html           # Template HTML
+│   │   └── app.css            # Styles globaux
+│   ├── static/                # Fichiers statiques
+│   ├── package.json           # Dépendances Node.js
+│   └── Dockerfile             # Docker Frontend
+├── docker-compose.yml         # Orchestration Docker
+└── README.md                  # Documentation
+
+================================================================================
+🚀 INSTALLATION RAPIDE
+================================================================================
+
+AVEC DOCKER (RECOMMANDÉ) :
+   docker-compose up -d --build
+
+SANS DOCKER :
+
+   # Backend
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # ou venv\Scripts\activate (Windows)
+   pip install -r requirements.txt
+   cp .env.example .env
+   # Éditer .env avec vos configurations
+   alembic upgrade head
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+   # Frontend
+   cd frontend
+   npm install
+   npm run dev
+
+================================================================================
+🔐 AUTHENTIFICATION
+================================================================================
+
+L'API utilise JWT (JSON Web Tokens) pour l'authentification.
+
+UTILISATEUR PAR DÉFAUT (créé automatiquement au premier démarrage) :
+   👤 Nom d'utilisateur : Ozias
+   📞 Téléphone : +22661506121
+   🔑 Mot de passe : 12345678
+   ⭐ Rôles : Tous les rôles (Super Admin)
+
+ENDPOINTS D'AUTHENTIFICATION :
+   POST /api/v1/auth/login    - Se connecter
+   POST /api/v1/auth/register - S'inscrire
+   POST /api/v1/auth/refresh  - Rafraîchir le token
+   POST /api/v1/auth/logout   - Se déconnecter
+
+================================================================================
+📚 DOCUMENTATION API
+================================================================================
+
+Une fois le serveur démarré :
+
+   🔵 Swagger UI  : http://localhost:8000/docs
+   🔴 ReDoc      : http://localhost:8000/redoc
+
+================================================================================
+🧪 TESTS
+================================================================================
+
+# Backend
+cd backend
+pytest
+
+# Frontend
+cd frontend
+npm run test
+
+================================================================================
+📊 INDICATEURS CLÉS DE PERFORMANCE (KPI)
+================================================================================
+
+L'application suit automatiquement ces indicateurs :
+
+   - Nombre total d'animaux par espèce
+   - Taux de mortalité
+   - Taux de vaccination
+   - Rentabilité par espèce
+   - Production (lait, œufs, miel, viande)
+   - Indice de bien-être animal (BEA)
+   - Qualité de l'eau (pH, température, oxygène)
+   - Coûts d'exploitation par mois
+
+================================================================================
+🔄 PROCESSUS DE DÉVELOPPEMENT
+================================================================================
+
+1. Créer une branche pour chaque fonctionnalité
+   git checkout -b feature/nom-fonctionnalite
+
+2. Développer et tester localement
+   - Ajouter les tests
+   - Vérifier la qualité du code
+
+3. Committer les changements
+   git add .
+   git commit -m "feat: description claire"
+
+4. Pousser et créer une Pull Request
+   git push origin feature/nom-fonctionnalite
+
+5. Revue de code et fusion
+
+================================================================================
+📝 COMMITS CONVENTIONNELS
+================================================================================
+
+   feat: Nouvelle fonctionnalité
+   fix: Correction de bug
+   docs: Documentation
+   style: Formatage, style de code
+   refactor: Refactorisation du code
+   test: Ajout ou modification de tests
+   chore: Maintenance, dépendances
+   perf: Optimisation des performances
+
+EXEMPLE :
+   git commit -m "feat(auth): add JWT authentication middleware"
+
+================================================================================
+🤝 CONTRIBUTION
+================================================================================
+
+Les contributions sont les bienvenues !
+
+1. Fork le projet
+2. Créer une branche (git checkout -b feature/AmazingFeature)
+3. Commit (git commit -m 'Add some AmazingFeature')
+4. Push (git push origin feature/AmazingFeature)
+5. Ouvrir une Pull Request
+
+================================================================================
+📧 CONTACT
+================================================================================
+
+   🌐 Projet : https://github.com/1vKSfvhNz/farm
+   📧 Email : ozias@farm-manager.bf
+   📞 Téléphone : +22661506121
+
+================================================================================
+🏢 À PROPOS DE L'AUTEUR
+================================================================================
+
+   Ozias - Développeur Full Stack
+   Spécialisé en : FastAPI, SvelteKit, PostgreSQL, Docker
+   Expérience : Développement d'applications web et mobiles
+   Passion : Agriculture connectée et technologies vertes
+
+================================================================================
+✨ REMERCIEMENTS
+================================================================================
+
+   - FastAPI pour le framework backend
+   - SvelteKit pour le framework frontend
+   - PostgreSQL pour la base de données
+   - Redis pour le caching
+   - Tous les contributeurs open-source
+
+================================================================================
+📌 STATUT DU PROJET
+================================================================================
+
+   ✅ En développement actif
+   ✅ Version stable : 1.0.0
+   ✅ Documentation : Complète
+   ✅ Tests : En cours d'ajout
+
+================================================================================
+                    FARM MANAGER - © 2024 Tous droits réservés
+================================================================================
